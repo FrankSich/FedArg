@@ -127,7 +127,254 @@ The resulting feature set used by clients includes:
 - `Medications`
 - `Age_bin`
 
-### 4.2 Outcome harmonisation
+### 4.2 Detailed path from raw data to local training
+
+The complete hospital-side path is local. A hospital starts with its own raw CSV and does not upload that file to the coordinator. The file is read by [client/data_utils.py](client/data_utils.py), transformed into a standard schema, written to `data/processed/`, cleaned by [client/clean_app.py](client/clean_app.py), and then loaded by [client/client_app.py](client/client_app.py) for model training.
+
+```mermaid
+flowchart TD
+    A[Hospital raw CSV] --> B[Detect source columns]
+    B --> C[Standardise schema]
+    C --> D[Hash or generalise sensitive fields]
+    D --> E[Parse age and categorise sponsor]
+    E --> F[Save processed CSV locally]
+    F --> G[Drop unused identifiers and diagnosis]
+    G --> H[Impute missing vital signs]
+    H --> I[Create Age_bin and map Outcome]
+    I --> J[Encode categorical features]
+    J --> K[Standardise feature matrix]
+    K --> L[Apply local balancing]
+    L --> M[Split local train and test data]
+    M --> N[Train local PyTorch model]
+```
+
+#### Step 1: discover non-uniform source columns
+
+Hospital exports may use names such as `patient_id`, `patientno`, `insurance`, `heartrate`, `systolic`, or `discharge`. The implementation normalises column names by removing spaces and underscores, then searches for known aliases:
+
+```python
+def find_column(df, possible_names):
+	cols_lower = df.columns.str.lower().str.replace(
+		r'[\s_]', '', regex=True
+	)
+	for name in possible_names:
+		mask = cols_lower.str.contains(name, na=False)
+		if mask.any():
+			return df.columns[mask].tolist()[0]
+	return None
+```
+
+This allows different hospital schemas to be mapped into the common fields `Id`, `Age`, `Sponsor`, `Region`, the five vital signs, clinical fields, and `Outcome`. Missing source columns are assigned documented defaults such as `Unknown`, `Not recorded`, or an empty numeric column rather than causing the entire federation to stop.
+
+#### Step 2: transform age values
+
+The `parse_age_to_years()` function accepts an existing age, a value containing years, or a date of birth. For a birth date $b$ and reference date $r$, the intended calculation is:
+
+$$
+\mathrm{age} = r_{year} - b_{year} - \mathbf{1}[(r_{month},r_{day}) < (b_{month},b_{day})]
+$$
+
+Values outside the accepted range of 0 to 120 become missing. If valid ages exist, missing ages are filled with the local median:
+
+$$
+x_{age}^{*} = \begin{cases}
+x_{age}, & \text{if age is present}\\
+\operatorname{median}(Age_{local}), & \text{otherwise}
+\end{cases}
+$$
+
+The exact age is also grouped into `Age_bin`, using ranges `0-19`, `20-25`, `26-30`, `31-35`, `36-40`, `41-50`, `51+`, and `Unknown`. Age binning reduces precision before categorical encoding.
+
+#### Step 3: pseudonymise and generalise fields
+
+The preprocessing code hashes identifiers and selected sensitive values before saving the processed file:
+
+```python
+final_df["Id"] = (
+	df[id_col].apply(safe_hash, args=("id",))
+	if id_col else np.nan
+)
+final_df["Name"] = (
+	df[name_col].apply(safe_hash, args=("name",))
+	if name_col else np.nan
+)
+final_df["Diagnoses"] = (
+	df[diagnoses_col].apply(safe_hash, args=("diagnoses",))
+	if diagnoses_col else "Not recorded"
+)
+```
+
+Procedures are reduced to whether a value was recorded. Medication values are retained only in the local processed file and are later selected or generalised according to the client feature pipeline. The cleaning stage subsequently removes `Id`, `Name`, `Gender`, date of birth, ward, district, and diagnoses from the model input.
+
+#### Step 4: impute clinical measurements
+
+For each available vital-sign column, the cleaning code converts values to numeric form. Missing values are replaced by the hospital's local median. If an entire column is missing, a documented clinical default is used:
+
+| Variable | Default if the complete column is missing |
+|---|---:|
+| Pulse | 70 |
+| Resp | 16 |
+| Temp | 37 |
+| Sys | 120 |
+| Dia | 80 |
+
+For a vital-sign value $x_i$ in hospital $h$, the imputation rule is:
+
+$$
+x_{i,h}^{*} = \begin{cases}
+x_{i,h}, & x_{i,h}\text{ is observed}\\
+\operatorname{median}(X_h), & X_h\text{ contains observed values}\\
+d, & X_h\text{ is completely missing}
+\end{cases}
+$$
+
+The implementation also creates `*_was_missing` columns during cleaning. The active `load_data()` feature list selects the clinical variables, categorical variables, and `Age_bin` used by the model.
+
+#### Step 5: create the common outcome labels
+
+The cleaning layer maps local outcome strings into the shared label space:
+
+```python
+outcome_map = {
+	"Home": 0,
+	"Admitted": 1,
+	"Referred": 2,
+}
+unknown_outcome = 3
+
+df_clean["Outcome"] = (
+	df_clean["Outcome"].astype(str).str.strip().map(outcome_map)
+	.fillna(unknown_outcome).astype(int)
+)
+```
+
+The client then scans the cleaned hospital files and creates a global mapping so every client uses the same output positions. If hospital $k$ has local labels $y_k$, the global mapping applies one shared function $g(y_k)$ before training:
+
+$$
+y_{k}^{global} = g(y_k) \in \{0,1,2,3\}
+$$
+
+This is essential for FedAvg because the fourth output of a model must represent the same class at every hospital.
+
+#### Step 6: encode categorical features locally
+
+The client selects the exact input columns:
+
+```python
+features = [
+	"Age", "Sponsor", "Region", "Pulse", "Resp", "Temp",
+	"Sys", "Dia", "Procedures", "Medications", "Age_bin"
+]
+df = df[features]
+```
+
+The categorical columns are `Sponsor`, `Region`, `Procedures`, `Medications`, and `Age_bin`. Each is converted into one-hot indicator columns using `OneHotEncoder(handle_unknown="ignore")`. For category value $c$ in field $j$, one-hot encoding produces:
+
+$$
+\phi_j(c) = [\mathbf{1}(c=c_1),\mathbf{1}(c=c_2),\ldots,\mathbf{1}(c=c_m)]
+$$
+
+The encoded categorical columns are concatenated with numeric age and vital-sign columns. Unknown categories are ignored rather than raising an exception. The current implementation caches encoders in `GLOBAL_ENCODERS`; for a multi-machine deployment, the vocabulary and feature order should be versioned and distributed deterministically rather than depending on which concurrent client fits first.
+
+#### Step 7: standardise the model matrix
+
+After encoding, the client applies `StandardScaler` to the complete feature matrix:
+
+```python
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(df.values)
+X = torch.tensor(X_scaled, dtype=torch.float32)
+```
+
+For feature $j$, standardisation is:
+
+$$
+z_{ij} = \frac{x_{ij} - \mu_j}{\sigma_j + \varepsilon}
+$$
+
+where $\mu_j$ and $\sigma_j$ are calculated from the hospital's local matrix. This helps the neural network optimise across variables with different units, although local fitting means the same clinical value may receive different scales at different hospitals. A production federation should agree on a safe global or population-independent scaling policy.
+
+#### Step 8: perform local class balancing
+
+The current client applies SMOTE before the train/test split:
+
+```python
+counter = Counter(y_np)
+min_count = min(counter.values())
+
+if USE_SMOTE and min_count > 1:
+	k_neighbors = min(min_count - 1, 5)
+	smote = SMOTE(
+		sampling_strategy="auto",
+		random_state=42,
+		k_neighbors=k_neighbors,
+	)
+	X_res, y_res = smote.fit_resample(X_np, y_np)
+```
+
+SMOTE synthesises a minority observation between a sample $x_i$ and one of its minority neighbours $x_{nn}$:
+
+$$
+x_{new} = x_i + \lambda(x_{nn} - x_i), \qquad \lambda \sim U(0,1)
+$$
+
+The operation is performed locally, so synthetic patient-like records are not uploaded. For unbiased evaluation, the recommended order is to split the original local data first and apply SMOTE only to the training partition; the current order is documented as a methodological limitation.
+
+#### Step 9: split the local dataset
+
+The implementation uses an 80/20 local split with `random_state=42`. Stratification is enabled when every class has at least two examples:
+
+```python
+X_train, X_test, y_train, y_test = train_test_split(
+	X, y,
+	test_size=0.2,
+	random_state=42,
+	stratify=stratify,
+)
+```
+
+The test partition remains at the hospital and is used for local evaluation after federated rounds. It is not sent to the server.
+
+#### Step 10: compute class weights and train locally
+
+For training counts $n_c$ in class $c$, the client computes inverse-frequency weights:
+
+$$
+\hat{w}_c = \frac{1}{n_c + 10^{-6}}, \qquad
+w_c = \hat{w}_c\frac{C}{\sum_{r=1}^{C}\hat{w}_r}
+$$
+
+where $C$ is the number of output classes. The initial local model uses weighted cross-entropy with label smoothing:
+
+$$
+\mathcal{L} = -\sum_{i=1}^{N}w_{y_i}\sum_{c=1}^{C}q_{ic}\log p_{ic}
+$$
+
+where $q_{ic}$ is the smoothed target and $p_{ic}$ is the model softmax probability. The code then performs full-batch Adam optimisation:
+
+```python
+counts = torch.bincount(y_train, minlength=num_classes).float()
+weights = 1.0 / (counts + 1e-6)
+weights = weights / weights.sum() * num_classes
+
+criterion = nn.CrossEntropyLoss(
+	weight=weights,
+	label_smoothing=0.05,
+)
+optimizer = optim.Adam(model.parameters(), lr=0.0005)
+
+for epoch in range(epochs):
+	model.train()
+	optimizer.zero_grad()
+	out = model(X_train)
+	loss = criterion(out, y_train)
+	loss.backward()
+	optimizer.step()
+```
+
+This produces the locally trained state dictionary used to initialise the hospital client. In each later Flower round, the client receives the current global parameters, trains for 30 local epochs using weighted cross-entropy, and returns the resulting model parameters after the configured privacy transformations.
+
+### 4.3 Outcome harmonisation
 
 All institutions use the same label space:
 
@@ -140,7 +387,7 @@ All institutions use the same label space:
 
 The shared mapping is important because model outputs from different hospitals must represent the same clinical categories.
 
-### 4.3 Hashing and generalisation code
+### 4.4 Hashing and generalisation code
 
 The project's current salted hashing routine is:
 
