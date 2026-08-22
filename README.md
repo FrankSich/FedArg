@@ -40,11 +40,11 @@ flowchart LR
 		C --> D[Train local PyTorch model]
 		D --> E[Clip, add noise, and mask update]
 		D --> F[Evaluate on local test data]
-	end
-	E -->|Protected model update only| S[Flower coordinator]
-	S -->|FedAvg global model| D
-	F -->|Aggregate metrics only| R[Experiment results]
-	K[Other hospitals use the same client workflow] --> S
+	    E -->|Protected model update only| S[Flower coordinator]
+	    S -->|FedAvg global model| D
+	    F -->|Aggregate metrics only| R[Experiment results]
+	    K[Other hospitals use the same client workflow] --> S
+    end
 ```
 
 This is a representative view: every participating hospital uses the same client workflow shown inside the hospital boundary. The coordinator receives protected model updates and selected aggregate metrics, never the private patient records. `K` represents the total number of participating institutions.
