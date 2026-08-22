@@ -9,6 +9,29 @@ The architecture is best described as a **central-coordinator federated learning
 ## 1. System Objectives and Boundaries
 
 ### Objectives
+The proposed system aims to:
+
+- Enable several hospitals to learn a common clinical outcome model.
+- Avoid centralising raw patient records.
+- Harmonise differently structured hospital datasets.
+- Reduce exposure of direct identifiers and detailed clinical fields.
+- Address local class imbalance.
+- Measure performance separately for each hospital.
+- Provide a foundation for fairness and privacy analysis.
+
+### Trust boundaries
+
+There are three important boundaries:
+
+1. **Hospital boundary:** each institution owns and processes its local patient data.
+2. **Communication boundary:** model parameters move between clients and the Flower server.
+3. **Coordinator boundary:** the server coordinates rounds and aggregates updates but is not assumed to have access to raw patient rows.
+
+A production deployment would also need authenticated, encrypted client-server communication, access control, audit logs, secret management, and an explicit threat model. The current local configuration uses `127.0.0.1:9090`, which is suitable for experimentation but not a distributed clinical deployment.
+
+## 2. High-Level Architecture
+
+```mermaid
 flowchart LR
     A[Hospital data] --> B[Local preprocessing]
     B --> C[Local training]
@@ -18,18 +41,11 @@ flowchart LR
     C --> E[Local evaluation]
     E --> R[Aggregate results]
     K[Other hospitals use the same client pattern] --> S
-    G --> HB3
-    G --> HC3
-This is a representative view: every participating hospital follows the same client pattern shown in the diagram. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
+```
+
+This is a representative view: every participating hospital follows the same client pattern shown in the diagram, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
 
 **Plain-text flow:** Hospital data -> local preprocessing -> local training -> privacy protection -> Flower server/FedAvg -> updated model returned to the hospital. Other hospitals follow the same pattern. Raw patient rows remain at the hospital.
-
-
-    HA3 --> E[Local evaluation and metrics]
-    HB3 --> E
-    HC3 --> E
-    E --> O[results/<br/>CSV summaries, confusion matrices, plots]
-```
 
 The architecture has two complementary pipelines:
 
