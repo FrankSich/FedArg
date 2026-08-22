@@ -29,7 +29,10 @@ data/processed/
 data/cleaned/
 
 # Experiment outputs may contain sensitive or large derived data.
-results/
+results/*
+!results/
+!results/**/*.png
+results/**/*.csv
 *.pdf
 
 # Local logs and temporary files
