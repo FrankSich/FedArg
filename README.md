@@ -551,7 +551,7 @@ Privacy is implemented as a layered design rather than a single algorithm. Data 
 Each hospital client reads its own CSV, performs preprocessing locally, constructs tensors locally, and trains locally. The server receives model-related values rather than the original patient table.
 
 ```mermaid
-flowchart LR
+flowchart TD
 	H[Hospital data store] -->|Raw rows remain inside hospital| L[Hospital client]
 	L -->|Parameters, sample count, selected metrics| S[Flower server]
 	S -->|Global model parameters| L
