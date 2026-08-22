@@ -34,19 +34,22 @@ A production deployment would also need authenticated, encrypted client-server c
 
 ```mermaid
 flowchart LR
-    A[Hospital data] --> B[Local preprocessing]
-    B --> C[Local training]
-    C --> D[Privacy protection]
-    D --> S[Flower server and FedAvg]
-    S --> C
-    C --> E[Local evaluation]
-    E --> R[Aggregate results]
-    K[Other hospitals use the same client pattern] --> S
+	subgraph H[Hospital client repeated at each institution]
+		A[Private patient records] --> B[Preprocess and harmonise]
+		B --> C[Encode features and split data]
+		C --> D[Train local PyTorch model]
+		D --> E[Clip, add noise, and mask update]
+		D --> F[Evaluate on local test data]
+	end
+	E -->|Protected model update only| S[Flower coordinator]
+	S -->|FedAvg global model| D
+	F -->|Aggregate metrics only| R[Experiment results]
+	K[Other hospitals use the same client workflow] --> S
 ```
 
-This is a representative view: every participating hospital follows the same client pattern shown in the diagram, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
+This is a representative view: every participating hospital uses the same client workflow shown inside the hospital boundary. The coordinator receives protected model updates and selected aggregate metrics, never the private patient records. `K` represents the total number of participating institutions.
 
-**Plain-text flow:** Hospital data -> local preprocessing -> local training -> privacy protection -> Flower server/FedAvg -> updated model returned to the hospital. Other hospitals follow the same pattern. Raw patient rows remain at the hospital.
+**Plain-text flow:** Private patient records -> local preprocessing -> local training -> update protection -> Flower/FedAvg coordinator -> global model returned to the hospital. Raw patient rows remain inside each hospital.
 
 The architecture has two complementary pipelines:
 
