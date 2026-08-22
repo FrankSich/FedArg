@@ -302,7 +302,7 @@ Federated learning prevents direct raw-row sharing, but model updates can still 
 For an input value $x$ and secret salt $s$, the client computes:
 
 $$
-h = \operatorname{SHA256}(s \mathbin{||} \operatorname{normalise}(x))
+h = \mathrm{SHA256}(s || \mathrm{normalise}(x))
 $$
 
 where $\mathbin{||}$ means concatenation. The same salt and value produce the same digest, which supports local duplicate detection without transmitting the original value. Hashing is not encryption: low-entropy values may still be guessed if the salt is exposed or an attacker can test candidate values.
@@ -337,13 +337,13 @@ def clip_and_add_noise(params, C=5.0, sigma=DP_SIGMA):
 For tensor $w$ and clipping threshold $C$:
 
 $$
-\operatorname{clip}(w,C) = w\min\left(1, \frac{C}{\lVert w\rVert_2 + 10^{-8}}\right)
+\mathrm{clip}(w,C) = w\min\left(1, \frac{C}{||w||_2 + 10^{-8}}\right)
 $$
 
 The released tensor is:
 
 $$
-	ilde{w} = \operatorname{clip}(w,C) + z, \qquad z \sim \mathcal{N}(0,\sigma^2I)
+	ilde{w} = \mathrm{clip}(w,C) + z, \qquad z \sim \mathcal{N}(0,\sigma^2I)
 $$
 
 The code uses `C = 5.0` and `DP_SIGMA = 0.002` when enabled. This is not sufficient to claim formal differential privacy because the implementation does not define update sensitivity, use per-example gradient clipping, or calculate an accountant-derived $(\epsilon, \delta)$. Opacus is listed as a dependency, but the active path does not use a `PrivacyEngine` or privacy accountant.

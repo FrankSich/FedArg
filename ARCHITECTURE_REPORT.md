@@ -327,7 +327,7 @@ In a real deployment, each hospital should expose only an authenticated client g
 For an input value $x$ and secret salt $s$, the client computes:
 
 $$
-h = \operatorname{SHA256}(s \mathbin{||} \operatorname{normalise}(x))
+h = \mathrm{SHA256}(s || \mathrm{normalise}(x))
 $$
 
 where $\mathbin{||}$ means concatenation. The same salt and value produce the same digest, which supports local duplicate detection without transmitting the original value. Hashing is not encryption: low-entropy values may still be guessed if the salt is exposed or an attacker can test candidate values. The current salts are stored in source code and must be moved to protected, institution-specific secrets.
@@ -366,13 +366,13 @@ def clip_and_add_noise(params, C=5.0, sigma=DP_SIGMA):
 Conceptually, this resembles:
 
 $$
-\tilde{w} = \operatorname{clip}(w, C) + \mathcal{N}(0, \sigma^2I)
+	ilde{w} = \mathrm{clip}(w, C) + \mathcal{N}(0, \sigma^2I)
 $$
 
 More explicitly, for tensor $w$ and clipping threshold $C$, the implementation computes:
 
 $$
-\operatorname{clip}(w,C) = w\min\left(1, \frac{C}{\lVert w\rVert_2 + 10^{-8}}\right)
+\mathrm{clip}(w,C) = w\min\left(1, \frac{C}{||w||_2 + 10^{-8}}\right)
 $$
 
 and then adds $z \sim \mathcal{N}(0,\sigma^2I)$. Clipping bounds the magnitude of the submitted tensor, while the Gaussian term makes the exact unnoised value less precise. The code uses `C = 5.0` and `DP_SIGMA = 0.002` when enabled.
