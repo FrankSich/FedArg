@@ -228,6 +228,21 @@ for epoch in range(1, 31):
 
 Local SMOTE and class weighting are intended to reduce local class imbalance. SMOTE should ideally be applied only to the training partition; applying it before the train/test split can allow synthetic information to influence evaluation.
 
+### Class imbalance and privacy-preserving learning roadmap
+
+Healthcare outcomes are often imbalanced: a small minority class can be clinically important even when it represents relatively few records. The project should evaluate balancing methods inside each hospital client, after the local train/test split, so that the test partition remains an untouched estimate of generalisation.
+
+The recommended methods are:
+
+1. **SMOTE:** create synthetic minority examples by interpolating between minority-class neighbours. The current client includes local SMOTE, but the split order should be corrected so synthetic samples are created only from local training data.
+2. **ADASYN:** create more synthetic examples near difficult or sparsely represented minority observations. ADASYN is a candidate alternative to SMOTE and should be evaluated locally without transmitting the synthetic records.
+3. **Class-weighted optimisation:** assign larger loss weights to minority classes. The current client uses weighted cross-entropy, so this is the currently implemented algorithm-level approach.
+4. **Focal loss:** reduce the contribution of easy examples and focus optimisation on difficult or misclassified cases. This is a future alternative to weighted cross-entropy, not currently active in the pipeline.
+
+Balancing is compatible with federated learning because the resampling or loss calculation occurs inside each hospital. Synthetic records must still remain local; they must never be uploaded to the coordinator. Experiments should compare no balancing, SMOTE, ADASYN, class weighting, and focal loss using macro-F1, minority recall, balanced accuracy, and calibration, in addition to ordinary accuracy.
+
+Privacy-enhancing methods should be applied after local training has produced the outgoing update. Differential Privacy (DP) can clip a well-defined client update or per-example gradient and add calibrated noise, while Secure Multi-Party Computation (SMPC) or cryptographic secure aggregation can prevent the coordinator from inspecting an individual update. The current project contains prototype clipping/noise and masking functions, but formal DP accounting and a correct SMPC protocol remain future integration work.
+
 ## 6. Server and Aggregation Architecture
 
 The active server is in [server/server_app.py](server/server_app.py):
@@ -459,7 +474,22 @@ The implementation calculates accuracy, precision, recall/sensitivity, specifici
 9. Calculate subgroup recall, false-positive rate, demographic parity, and equal opportunity.
 10. Record consent, data-sharing agreements, ethics approval, model versions, audit events, and rollback procedures.
 
-## 11. Reproducibility
+## 11. Public Repository Transparency Package
+
+For an openly available research repository, the following items provide transparency and reproducibility while respecting restrictions on confidential human data:
+
+- **Anonymisation code:** hashing, generalisation, identifier removal, and secret-management guidance.
+- **Preprocessing code:** schema harmonisation, missing-value handling, age binning, outcome mapping, and quality checks.
+- **Federated-learning code:** client training, server orchestration, FedAvg configuration, privacy transformations, and evaluation.
+- **Synthetic or example data:** small non-identifying fixtures that demonstrate the pipeline without representing real patients. Never publish confidential human records.
+- **Data dictionary:** field definitions, data types, allowed values, transformations, and clinical meaning where appropriate.
+- **Aggregate statistics:** per-hospital counts, missingness summaries, class distributions, and aggregate performance only.
+- **Experiment configuration:** rounds, local epochs, learning rate, client participation, random seeds, balancing method, DP settings, and model version.
+- **Reproducibility scripts:** commands or scripts that recreate preprocessing, training, evaluation, tables, and figures from approved example data.
+
+The repository should explicitly document which artifacts are withheld because of confidentiality. In this project, raw, processed, and cleaned patient CSV files remain excluded through `.gitignore`; generated PNG figures may be published because they are aggregate visual outputs, but every figure should still be reviewed for disclosure risk. Secrets such as hashing salts must never be included in a public repository.
+
+## 12. Reproducibility
 
 From the repository root:
 
