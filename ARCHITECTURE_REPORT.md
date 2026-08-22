@@ -9,45 +9,21 @@ The architecture is best described as a **central-coordinator federated learning
 ## 1. System Objectives and Boundaries
 
 ### Objectives
-
-    R[Hospital data store<br/>raw patient records] --> P[Local preprocessing<br/>cleaning, harmonisation, deduplication]
-    P --> C[Local feature dataset]
-
-    subgraph H[Representative hospital client]
-        C --> E[Local encoding and scaling]
-        E --> T[Local train/test split<br/>and balancing]
-        T --> M[Local PyTorch training]
-        M --> Q[Privacy transformation]
-        M --> V[Local evaluation]
-flowchart TB
-    R[data/raw/HospitalA.csv<br/>HospitalB.csv<br/>HospitalC.csv]
-    Q --> S[Flower server<br/>FedAvg-style aggregation]
-    R --> P --> C
-    G --> M
-    V --> O[Aggregate results<br/>metrics and figures]
-    K[Other participating hospitals<br/>same client pattern] -.-> S
-        HA1 --> HA2[Local train/test split and SMOTE]
-        HA2 --> HA3[PyTorch local training]
-This is a representative view: every participating hospital follows the same client pattern shown inside the boundary, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
-
-        HA3 --> HA4[Privacy transformation]
-        HB --> HB1[Local encoding and scaling]
-        HB1 --> HB2[Local train/test split and SMOTE]
-        HB2 --> HB3[PyTorch local training]
-        HB3 --> HB4[Privacy transformation]
-        HC --> HC1[Local encoding and scaling]
-        HC1 --> HC2[Local train/test split and SMOTE]
-        HC2 --> HC3[PyTorch local training]
-        HC3 --> HC4[Privacy transformation]
-    end
-
-    HA4 --> S[Flower server<br/>FedAvg-style aggregation]
-    HB4 --> S
-    HC4 --> S
-    S --> G[Updated global model parameters]
-    G --> HA3
+flowchart LR
+    A[Hospital data] --> B[Local preprocessing]
+    B --> C[Local training]
+    C --> D[Privacy protection]
+    D --> S[Flower server and FedAvg]
+    S --> C
+    C --> E[Local evaluation]
+    E --> R[Aggregate results]
+    K[Other hospitals use the same client pattern] --> S
     G --> HB3
     G --> HC3
+This is a representative view: every participating hospital follows the same client pattern shown in the diagram. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
+
+**Plain-text flow:** Hospital data -> local preprocessing -> local training -> privacy protection -> Flower server/FedAvg -> updated model returned to the hospital. Other hospitals follow the same pattern. Raw patient rows remain at the hospital.
+
 
     HA3 --> E[Local evaluation and metrics]
     HB3 --> E

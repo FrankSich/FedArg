@@ -33,24 +33,20 @@ A production deployment would also need authenticated, encrypted client-server c
 ## 2. High-Level Architecture
 
 ```mermaid
-flowchart TB
-	R[Hospital data store<br/>raw patient records] --> P[Local preprocessing<br/>cleaning, harmonisation, deduplication]
-	P --> C[Local feature dataset]
-	subgraph H[Representative hospital client]
-		C --> E[Local encoding and scaling]
-		E --> T[Local train/test split<br/>and balancing]
-		T --> M[Local PyTorch training]
-		M --> Q[Privacy transformation]
-		M --> V[Local evaluation]
-	end
-	Q --> S[Flower server<br/>FedAvg-style aggregation]
-	S --> G[Updated global model parameters]
-	G --> M
-	V --> O[Aggregate results<br/>metrics and figures]
-	K[Other participating hospitals<br/>same client pattern] -.-> S
+flowchart LR
+    A[Hospital data] --> B[Local preprocessing]
+    B --> C[Local training]
+    C --> D[Privacy protection]
+    D --> S[Flower server and FedAvg]
+    S --> C
+    C --> E[Local evaluation]
+    E --> R[Aggregate results]
+    K[Other hospitals use the same client pattern] --> S
 ```
 
-This is a representative view: every participating hospital follows the same client pattern shown inside the boundary, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
+This is a representative view: every participating hospital follows the same client pattern shown in the diagram, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
+
+**Plain-text flow:** Hospital data -> local preprocessing -> local training -> privacy protection -> Flower server/FedAvg -> updated model returned to the hospital. Other hospitals follow the same pattern. Raw patient rows remain at the hospital.
 
 The architecture has two complementary pipelines:
 
