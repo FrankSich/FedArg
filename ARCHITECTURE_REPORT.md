@@ -10,44 +10,26 @@ The architecture is best described as a **central-coordinator federated learning
 
 ### Objectives
 
-The proposed system aims to:
+    R[Hospital data store<br/>raw patient records] --> P[Local preprocessing<br/>cleaning, harmonisation, deduplication]
+    P --> C[Local feature dataset]
 
-- Enable several hospitals to learn a common clinical outcome model.
-- Avoid centralising raw patient records.
-- Harmonise differently structured hospital datasets.
-- Reduce exposure of direct identifiers and detailed clinical fields.
-- Address local class imbalance.
-- Measure performance separately for each hospital.
-- Provide a foundation for fairness and privacy analysis.
-
-### Trust boundaries
-
-There are three important boundaries:
-
-1. **Hospital boundary:** each institution owns and processes its local patient data.
-2. **Communication boundary:** model parameters move between clients and the Flower server.
-3. **Coordinator boundary:** the server coordinates rounds and aggregates updates but is not assumed to have access to raw patient rows.
-
-A production deployment would also need authenticated, encrypted client-server communication, access control, audit logs, secret management, and an explicit threat model. The current local configuration uses `127.0.0.1:9090`, which is suitable for experimentation but not a distributed clinical deployment.
-
-## 2. High-Level Architecture
-
-```mermaid
+    subgraph H[Representative hospital client]
+        C --> E[Local encoding and scaling]
+        E --> T[Local train/test split<br/>and balancing]
+        T --> M[Local PyTorch training]
+        M --> Q[Privacy transformation]
+        M --> V[Local evaluation]
 flowchart TB
     R[data/raw/HospitalA.csv<br/>HospitalB.csv<br/>HospitalC.csv]
-    P[Preprocessing and harmonisation<br/>column detection, cleaning, deduplication]
-    C[Cleaned local datasets<br/>data/cleaned/]
-
+    Q --> S[Flower server<br/>FedAvg-style aggregation]
     R --> P --> C
-
-    C --> HA[Hospital A client]
-    C --> HB[Hospital B client]
-    C --> HC[Hospital C client]
-
-    subgraph Local hospital processing
-        HA --> HA1[Local encoding and scaling]
+    G --> M
+    V --> O[Aggregate results<br/>metrics and figures]
+    K[Other participating hospitals<br/>same client pattern] -.-> S
         HA1 --> HA2[Local train/test split and SMOTE]
         HA2 --> HA3[PyTorch local training]
+This is a representative view: every participating hospital follows the same client pattern shown inside the boundary, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
+
         HA3 --> HA4[Privacy transformation]
         HB --> HB1[Local encoding and scaling]
         HB1 --> HB2[Local train/test split and SMOTE]

@@ -34,39 +34,23 @@ A production deployment would also need authenticated, encrypted client-server c
 
 ```mermaid
 flowchart TB
-	R[data/raw/HospitalA.csv<br/>HospitalB.csv<br/>HospitalC.csv]
-	P[Preprocessing and harmonisation<br/>column detection, cleaning, deduplication]
-	C[Cleaned local datasets<br/>data/cleaned/]
-	R --> P --> C
-	C --> HA[Hospital A client]
-	C --> HB[Hospital B client]
-	C --> HC[Hospital C client]
-	subgraph Local hospital processing
-		HA --> HA1[Local encoding and scaling]
-		HA1 --> HA2[Local train/test split and SMOTE]
-		HA2 --> HA3[PyTorch local training]
-		HA3 --> HA4[Privacy transformation]
-		HB --> HB1[Local encoding and scaling]
-		HB1 --> HB2[Local train/test split and SMOTE]
-		HB2 --> HB3[PyTorch local training]
-		HB3 --> HB4[Privacy transformation]
-		HC --> HC1[Local encoding and scaling]
-		HC1 --> HC2[Local train/test split and SMOTE]
-		HC2 --> HC3[PyTorch local training]
-		HC3 --> HC4[Privacy transformation]
+	R[Hospital data store<br/>raw patient records] --> P[Local preprocessing<br/>cleaning, harmonisation, deduplication]
+	P --> C[Local feature dataset]
+	subgraph H[Representative hospital client]
+		C --> E[Local encoding and scaling]
+		E --> T[Local train/test split<br/>and balancing]
+		T --> M[Local PyTorch training]
+		M --> Q[Privacy transformation]
+		M --> V[Local evaluation]
 	end
-	HA4 --> S[Flower server<br/>FedAvg-style aggregation]
-	HB4 --> S
-	HC4 --> S
+	Q --> S[Flower server<br/>FedAvg-style aggregation]
 	S --> G[Updated global model parameters]
-	G --> HA3
-	G --> HB3
-	G --> HC3
-	HA3 --> E[Local evaluation and metrics]
-	HB3 --> E
-	HC3 --> E
-	E --> O[results/<br/>CSV summaries, confusion matrices, plots]
+	G --> M
+	V --> O[Aggregate results<br/>metrics and figures]
+	K[Other participating hospitals<br/>same client pattern] -.-> S
 ```
+
+This is a representative view: every participating hospital follows the same client pattern shown inside the boundary, while `K` denotes the total number of institutions. The overview intentionally avoids repeating Hospital A, Hospital B, and Hospital C because those names describe one experiment instance, not different architectural components.
 
 The architecture has two complementary pipelines:
 
