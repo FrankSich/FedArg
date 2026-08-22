@@ -177,9 +177,9 @@ $$
 Values outside the accepted range of 0 to 120 become missing. If valid ages exist, missing ages are filled with the local median:
 
 $$
-x_{age}^{*} = \begin{cases}
-x_{age}, & \text{if age is present}\\
-\operatorname{median}(Age_{local}), & \text{otherwise}
+x_{\text{age}}^{*} = \begin{cases}
+x_{\text{age}}, & \text{if age is present}\\
+\mathrm{median}(\mathrm{Age}_{\text{local}}), & \text{otherwise}
 \end{cases}
 $$
 
@@ -223,7 +223,7 @@ For a vital-sign value $x_i$ in hospital $h$, the imputation rule is:
 $$
 x_{i,h}^{*} = \begin{cases}
 x_{i,h}, & x_{i,h}\text{ is observed}\\
-\operatorname{median}(X_h), & X_h\text{ contains observed values}\\
+\mathrm{median}(X_h), & X_h\text{ contains observed values}\\
 d, & X_h\text{ is completely missing}
 \end{cases}
 $$
@@ -276,6 +276,19 @@ $$
 
 The encoded categorical columns are concatenated with numeric age and vital-sign columns. Unknown categories are ignored rather than raising an exception. The current implementation caches encoders in `GLOBAL_ENCODERS`; for a multi-machine deployment, the vocabulary and feature order should be versioned and distributed deterministically rather than depending on which concurrent client fits first.
 
+Recommended encoder handling for production:
+
+```python
+# pre-fit encoders centrally and distribute them to clients, or load a serialized encoder bundle
+import pickle
+with open('encoders/onehot_encoders.pkl','rb') as fh:
+	GLOBAL_ENCODERS = pickle.load(fh)
+
+# clients then call transform() rather than fit_transform()
+```
+
+Avoid fitting encoders on the first client that runs; instead publish a versioned encoder bundle with the experiment.
+
 #### Step 7: standardise the model matrix
 
 After encoding, the client applies `StandardScaler` to the complete feature matrix:
@@ -319,6 +332,25 @@ x_{new} = x_i + \lambda(x_{nn} - x_i), \qquad \lambda \sim U(0,1)
 $$
 
 The operation is performed locally, so synthetic patient-like records are not uploaded. For unbiased evaluation, the recommended order is to split the original local data first and apply SMOTE only to the training partition; the current order is documented as a methodological limitation.
+
+Recommended (safer) SMOTE placement — split first, then resample the training partition only:
+
+```python
+# recommended: split first, then resample training partition only
+X_train, X_test, y_train, y_test = train_test_split(
+	X, y, test_size=0.2, random_state=42,
+	stratify=y if len(np.unique(y)) > 1 else None,
+)
+
+if USE_SMOTE and min(np.bincount(y_train)) > 1:
+	k_neighbors = min(5, min(np.bincount(y_train)) - 1)
+	smote = SMOTE(sampling_strategy="auto", random_state=42, k_neighbors=k_neighbors)
+	X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+else:
+	X_train_res, y_train_res = X_train, y_train
+```
+
+This guarantees that synthetic samples cannot leak into the held-out evaluation partition.
 
 #### Step 9: split the local dataset
 
