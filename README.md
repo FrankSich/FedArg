@@ -662,9 +662,11 @@ The system saves numerical and visual outputs under `results/`.
 
 ### Dataset and contribution figures
 
+**Table 2: Hospital statistics of the dataset contributed by participating hospitals**
+
 The dataset-size figure and hospital summary use the cleaned local records that are loaded by the clients:
 
-| Hospital | Records | Features | Missing (%) | Classes (Outcome) |
+| Hospital | Records | Features | Missing<br>(%) | Classes<br>Outcome |
 |---|---:|---:|---:|---:|
 | Hospital A | 10,569 | 11 | 0.00 | 2 |
 | Hospital B | 990 | 11 | 0.00 | 2 |
