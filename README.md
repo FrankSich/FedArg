@@ -662,13 +662,15 @@ The system saves numerical and visual outputs under `results/`.
 
 ### Dataset and contribution figures
 
-The dataset-size figure uses the cleaned local records for each participating hospital:
+The dataset-size figure and hospital summary use the cleaned local records that are loaded by the clients:
 
-| Hospital | Cleaned records used |
-|---|---:|
-| Hospital A | 10,569 |
-| Hospital B | 990 |
-| Hospital C | 1,770 |
+| Hospital | Records | Features | Missing (%) | Classes (Outcome) |
+|---|---:|---:|---:|---:|
+| Hospital A | 10,569 | 11 | 0.00 | 2 |
+| Hospital B | 990 | 11 | 0.00 | 2 |
+| Hospital C | 1,770 | 11 | 0.00 | 2 |
+
+`Features` counts the model input columns before one-hot encoding. `Missing (%)` is measured after the local cleaning and imputation step; identifier fields are removed before training.
 
 ![Dataset size by hospital](results/global/dataset_sizes_by_hospital.png)
 
