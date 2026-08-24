@@ -686,6 +686,10 @@ The dataset-size figure and hospital summary use the cleaned local records that 
 
 The missing-value table is generated from all processed hospital records with `tools/generate_missing_value_table.py` before the local cleaning and imputation step.
 
+![Privacy and SMOTE results](results/global/privacy_smote_results.png)
+
+The privacy and SMOTE results table is generated from the recorded experiment summary with `tools/generate_privacy_smote_table.py`. Baseline, DP-only, and before-SMOTE metrics are marked as not recorded because those comparison runs are not present in the repository.
+
 ### Hospital-level confusion matrices
 
 The current evaluation converts the four-class outcome into a binary task: `Admitted` is positive and all other outcomes are negative.
