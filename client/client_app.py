@@ -374,6 +374,8 @@ def load_data(csv_path):
 def get_global_outcome_classes(cleaned_dir="data/cleaned"):
     all_classes = set()
     for csv in Path(cleaned_dir).glob("*.csv"):
+        if csv.name.endswith("_mapped.csv"):
+            continue
         df = pd.read_csv(csv)
         all_classes.update(df["Outcome"].unique())
     return {cls: i for i, cls in enumerate(sorted(all_classes))}
