@@ -682,6 +682,10 @@ The dataset-size figure and hospital summary use the cleaned local records that 
 
 ![Contribution matrix](results/global/contribution_matrix.png)
 
+![Missing value analysis and preprocessing strategy](results/global/missing_value_analysis.png)
+
+The missing-value table is generated from all processed hospital records with `tools/generate_missing_value_table.py` before the local cleaning and imputation step.
+
 ### Hospital-level confusion matrices
 
 The current evaluation converts the four-class outcome into a binary task: `Admitted` is positive and all other outcomes are negative.
