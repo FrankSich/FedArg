@@ -31,9 +31,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 
-USE_DP = True
-USE_SMPC = True
-USE_SMOTE = True
+def env_flag(name, default):
+    value = os.getenv(name)
+    return default if value is None else value.lower() in {"1", "true", "yes"}
+
+
+USE_DP = env_flag("MWAKATOBE_USE_DP", True)
+USE_SMPC = env_flag("MWAKATOBE_USE_SMPC", True)
+USE_SMOTE = env_flag("MWAKATOBE_USE_SMOTE", True)
+RESULTS_ONLY = env_flag("MWAKATOBE_RESULTS_ONLY", False)
 
 # experiment parameter
 DP_SIGMA = 0.002  # noise scale for differential privacy
@@ -72,7 +78,7 @@ HOSPITAL_PREDICTIONS = {}
 # MULTIPLE EXPERIMENT SUPPORT
 # =====================================================
 
-NUM_RUNS = 10
+NUM_RUNS = int(os.getenv("MWAKATOBE_NUM_RUNS", "10"))
 
 EXPERIMENT_RESULTS = []
 
@@ -919,6 +925,8 @@ def start_flower_client(csv_path, class_to_index):
 # -------------------------------
 @atexit.register
 def generate_confusion_matrix_images():
+    if RESULTS_ONLY:
+        return
 
     cm_dir = Path(
         "results/confusion_matrices"
@@ -1067,16 +1075,18 @@ def finalize():
         v["test"] for v in HOSPITAL_STATS.values()
     ), "❌ Sample count mismatch – evaluation bug detected"
 
-    plot_dataset_sizes_by_hospital()
-    plot_federated_weights()
-    plot_sample_distribution()
-    plot_contribution_matrix()
-    plot_epoch_accuracy_per_hospital()
-    plot_epoch_loss_per_hospital()
+    if not RESULTS_ONLY:
+        plot_dataset_sizes_by_hospital()
+        plot_federated_weights()
+        plot_sample_distribution()
+        plot_contribution_matrix()
+        plot_epoch_accuracy_per_hospital()
+        plot_epoch_loss_per_hospital()
     print_hospital_summary()
     print_global_summary()
     save_experiment_results()
-    plot_experiment_comparison()
+    if not RESULTS_ONLY:
+        plot_experiment_comparison()
 
     # ================================
     # FINAL CHRONOLOGICAL TRAINING LOG

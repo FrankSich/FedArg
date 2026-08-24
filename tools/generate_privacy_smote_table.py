@@ -6,11 +6,14 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 SUMMARY_PATH = ROOT / "results" / "experiment_summary.csv"
+COMPARISON_DIR = ROOT / "results" / "experiments" / "comparisons"
 OUTPUT_PATH = ROOT / "results" / "global" / "privacy_smote_results.png"
 
 
 def format_metric(summary, metric):
     row = summary.loc[summary["Metric"] == metric].iloc[0]
+    if pd.isna(row["Std"]):
+        return f"{row['Mean']:.2f}"
     return f"{row['Mean']:.2f} +/- {row['Std']:.2f}"
 
 
@@ -37,9 +40,30 @@ def add_table(axis, title, columns, rows, bbox):
 
 
 def generate_table():
-    summary = pd.read_csv(SUMMARY_PATH)
     metrics = ["Accuracy", "Precision", "Recall", "F1", "FPR", "FNR"]
-    available = [format_metric(summary, metric) for metric in metrics]
+    result_files = {
+        "baseline": COMPARISON_DIR / "baseline_smote.csv",
+        "dp_only": COMPARISON_DIR / "dp_only_smote.csv",
+        "dp_smpc_smote": SUMMARY_PATH,
+        "dp_smpc_no_smote": COMPARISON_DIR / "dp_smpc_no_smote.csv",
+    }
+
+    summaries = {}
+    for name, path in result_files.items():
+        data = pd.read_csv(path)
+        if "Metric" in data.columns:
+            summaries[name] = data
+        else:
+            summaries[name] = pd.DataFrame({
+                "Metric": ["Accuracy", "Precision", "Recall", "Specificity", "F1", "FPR", "FNR"],
+                "Mean": [data[column].mean() for column in ["Accuracy", "Precision", "Recall", "Specificity", "F1", "FPR", "FNR"]],
+                "Std": [data[column].std() for column in ["Accuracy", "Precision", "Recall", "Specificity", "F1", "FPR", "FNR"]],
+            })
+
+    values = {
+        name: [format_metric(summary, metric) for metric in metrics]
+        for name, summary in summaries.items()
+    }
 
     figure, axis = plt.subplots(figsize=(13, 7))
     axis.axis("off")
@@ -55,7 +79,7 @@ def generate_table():
     figure.text(
         0.05,
         0.915,
-        "Available results: 10 runs with DP enabled, SMPC enabled, SMOTE enabled, sigma = 0.002",
+        "Comparison runs completed one by one; values are percentages and use one run unless +/- std is shown",
         ha="left",
         va="top",
         fontsize=10,
@@ -66,9 +90,9 @@ def generate_table():
         "Privacy configuration",
         ["Setup", "Accuracy", "Precision", "Recall", "F1", "FPR", "FNR"],
         [
-            ["Baseline FL\n(not recorded)", "-", "-", "-", "-", "-", "-"],
-            ["FL + DP only\n(not recorded)", "-", "-", "-", "-", "-", "-"],
-            ["FL + DP + SMPC\n(mean +/- std)", *available],
+            ["Baseline FL", *values["baseline"]],
+            ["FL + DP only", *values["dp_only"]],
+            ["FL + DP + SMPC", *values["dp_smpc_smote"]],
         ],
         [0.03, 0.50, 0.94, 0.26],
     )
@@ -78,8 +102,8 @@ def generate_table():
         "SMOTE configuration",
         ["Setup", "Accuracy", "Precision", "Recall", "F1", "FPR", "FNR"],
         [
-            ["Before SMOTE\n(not recorded)", "-", "-", "-", "-", "-", "-"],
-            ["After SMOTE\n(mean +/- std)", *available],
+            ["Before SMOTE", *values["dp_smpc_no_smote"]],
+            ["After SMOTE", *values["dp_smpc_smote"]],
         ],
         [0.03, 0.14, 0.94, 0.22],
     )

@@ -688,7 +688,7 @@ The missing-value table is generated from all processed hospital records with `t
 
 ![Privacy and SMOTE results](results/global/privacy_smote_results.png)
 
-The privacy and SMOTE results table is generated from the recorded experiment summary with `tools/generate_privacy_smote_table.py`. Baseline, DP-only, and before-SMOTE metrics are marked as not recorded because those comparison runs are not present in the repository.
+The privacy and SMOTE results table is generated from the recorded experiment summaries with `tools/generate_privacy_smote_table.py`. The comparison configurations were run one by one in isolated copies, so the existing project graphs were not regenerated.
 
 ### Hospital-level confusion matrices
 
