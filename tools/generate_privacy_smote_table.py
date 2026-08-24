@@ -44,7 +44,7 @@ def generate_table():
     result_files = {
         "baseline": COMPARISON_DIR / "baseline_smote.csv",
         "dp_only": COMPARISON_DIR / "dp_only_smote.csv",
-        "dp_smpc_smote": SUMMARY_PATH,
+        "dp_smpc_smote": COMPARISON_DIR / "dp_smpc_smote.csv",
         "dp_smpc_no_smote": COMPARISON_DIR / "dp_smpc_no_smote.csv",
     }
 
