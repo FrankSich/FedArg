@@ -412,10 +412,20 @@ def plot_dataset_sizes_by_hospital():
     ]
 
     plt.figure(figsize=(7, 5))
-    plt.bar(hospitals, totals)
+    bars = plt.bar(hospitals, totals)
+    for bar, total in zip(bars, totals):
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"n={total:,}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
     plt.xlabel("Hospitals")
     plt.ylabel("Number of Samples")
     plt.title("Dataset Size by Hospital")
+    plt.ylim(0, max(totals) * 1.12)
     plt.tight_layout()
     plt.savefig(out / "dataset_sizes_by_hospital.png", dpi=300)
     plt.close()

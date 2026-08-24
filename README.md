@@ -662,6 +662,14 @@ The system saves numerical and visual outputs under `results/`.
 
 ### Dataset and contribution figures
 
+The dataset-size figure uses the cleaned local records for each participating hospital:
+
+| Hospital | Cleaned records used |
+|---|---:|
+| Hospital A | 10,569 |
+| Hospital B | 990 |
+| Hospital C | 1,770 |
+
 ![Dataset size by hospital](results/global/dataset_sizes_by_hospital.png)
 
 ![Federated weights](results/global/federated_weights.png)
